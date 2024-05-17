@@ -14,6 +14,10 @@ use reqwest::{
 use std::str::FromStr;
 use thiserror::Error;
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+use netrc::Netrc;
+use std::env;
+use std::path::PathBuf;
+use std::io::BufReader;
 
 /// A synchronous HTTP store.
 #[derive(Debug)]
