@@ -83,7 +83,7 @@ impl HTTPStore {
 
 impl ReadableStorageTraits for HTTPStore {
     fn get(&self, key: &StoreKey) -> Result<MaybeBytes, StorageError> {
-        let (user, token) = load_netrc()?;    
+        let (user, token) = load_netrc().unwrap();    
         let credentials = format!("{}:{}", user, token);
         let credentials_enc = URL_SAFE.encode(&credentials);
     
