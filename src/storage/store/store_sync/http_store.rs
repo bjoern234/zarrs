@@ -8,11 +8,12 @@ use crate::{
 
 use itertools::Itertools;
 use reqwest::{
-    header::{HeaderValue, CONTENT_LENGTH, RANGE},
+    header::{HeaderValue, CONTENT_LENGTH, RANGE, HeaderMap, AUTHORIZATION},
     StatusCode, Url,
 };
 use std::str::FromStr;
 use thiserror::Error;
+use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 
 /// A synchronous HTTP store.
 #[derive(Debug)]
@@ -74,9 +75,26 @@ impl HTTPStore {
 
 impl ReadableStorageTraits for HTTPStore {
     fn get(&self, key: &StoreKey) -> Result<MaybeBytes, StorageError> {
+        let (user, token) = load_netrc()?;    
+        let credentials = format!("{}:{}", user, token);
+        let credentials_enc = URL_SAFE.encode(&credentials);
+    
+        // Create a HeaderMap and add the Authorization header
+        let mut headers = HeaderMap::new();
+            headers.insert(AUTHORIZATION, HeaderValue::from_str(&format!("Basic {}", credentials_enc)).unwrap());
+    
+        // Create a client with the headers
+        let client = reqwest::blocking::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap();
+
         let url = self.key_to_url(key)?;
-        let client = reqwest::blocking::Client::new();
-        let response = client.get(url).send()?;
+        // let client = reqwest::blocking::Client::new();
+        // let response = client.get(url).send()?;
+        let mut response = client.get(url)
+            .send()
+            .unwrap();
         match response.status() {
             StatusCode::OK => Ok(Some(response.bytes()?.to_vec())),
             StatusCode::NOT_FOUND => Ok(None),
@@ -182,6 +200,26 @@ impl ReadableStorageTraits for HTTPStore {
         }
     }
 }
+
+
+
+pub fn load_netrc() -> Result<(String, String), Box<dyn std::error::Error>> {
+    let home_dir = env::var("HOME")?;
+    let netrc_path = PathBuf::from(home_dir).join(".netrc");
+    let file = File::open(&netrc_path)?;
+    let reader = BufReader::new(file);
+    let netrc = Netrc::parse(reader).unwrap();
+
+    for (name, host) in netrc.hosts {
+        let login = host.login.clone();
+        let password = host.password.clone().ok_or("Missing password")?;
+        return Ok((login, password));
+    }
+
+    Err("Machine not found in .netrc file".into())
+}
+
+
 
 /// A HTTP store creation error.
 #[derive(Debug, Error)]
