@@ -18,6 +18,10 @@ use netrc::Netrc;
 use std::env;
 use std::path::PathBuf;
 use std::io::BufReader;
+use std::fs::File;
+use std::io::copy;
+use std::fs;
+use std::io::{self, ErrorKind};
 
 /// A synchronous HTTP store.
 #[derive(Debug)]
